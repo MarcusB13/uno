@@ -66,6 +66,8 @@ app.post("/lay-cards", (req, res) => {
     const { player, card, color } = req.body;
     try{
         var [tempPlayer, cardColor, action, isAction] = LayCards(players[player], card, usedCards, usedCardsColor, color, res);
+        usedCardsColor = cardColor;
+        players[player] = tempPlayer;
     } catch (err) {
         return;
     }
@@ -78,15 +80,19 @@ app.post("/lay-cards", (req, res) => {
             case "draw2":
                 let [tempNextPlayerDraw2, cardsDrawn2] = Draw(nextPlayer, deck, 2);
                 players[nextPlayer] = tempNextPlayerDraw2;
-                break;
+                return res.json({"player": players[player], "cardsDrawn": cardsDrawn4, "color": usedCardsColor});
 
             case "draw4":
                 let [tempNextPlayerDraw4, cardsDrawn4] = Draw(nextPlayer, deck, 4);
                 players[nextPlayer] = tempNextPlayerDraw4;
-                break;
+                return res.json({"player": players[player], "cardsDrawn": cardsDrawn4, "color": usedCardsColor});
 
             case "reverse":
-
+                tempPlayers = {};
+                Object.keys(players).reverse().forEach(obj => {
+                    tempPlayers[obj] = players[obj]
+                })
+                players = tempPlayers;
                 break;
             
             case "skip":
