@@ -9,12 +9,14 @@ const port = 80;
 
 const { CreateDeck, CreatePlayerDeck, DrawCard, LayCards, GetNextPlayer } = require('./controllers/cards.js');
 const { Draw } = require('./controllers/actions.js');
+const { CanRequestProceed } = require('./controllers/game.js');
 
 var players = {};
 var deck = [];
 var usedCards = [];
 var gameStarted = false;
 var usedCardsColor = "";
+var currentPlayersTurn = "";
 
 
 app.get('/start-game', async (req, res) => {
@@ -31,6 +33,7 @@ app.get('/start-game', async (req, res) => {
     players = tempPlayers;
 
     gameStarted = true;
+    currentPlayersTurn = Object.keys(players)[0];
     console.log("Game started, start color is: " + usedCardsColor)
     res.json(deck);
 })
@@ -49,21 +52,34 @@ app.get("/reset-game", (req, res) => {
 })
 
 app.post("/player-hand", (req, res) => {
-    if(!gameStarted){
-        res.status(400).send("Game has not started yet");
-    }
     const { player } = req.body;
+    let [error, canProceed] = CanRequestProceed(player, gameStarted, currentPlayersTurn);
+    if (!canProceed){
+        res.status(400).send(error)
+        return;
+    }
     res.json(players[player]);
 })
 
 app.post("/draw-card", (req, res) => {
     const { player } = req.body;
+    let [error, canProceed] = CanRequestProceed(player, gameStarted, currentPlayersTurn);
+    if (!canProceed){
+        res.status(400).send(error)
+        return;
+    }
     const card = DrawCard(deck, players[player]);
     res.json(card);
 })
 
 app.post("/lay-cards", (req, res) => {
     const { player, card, color } = req.body;
+    let [error, canProceed] = CanRequestProceed(player, gameStarted, currentPlayersTurn);
+    if (!canProceed){
+        res.status(400).send(error)
+        return;
+    }
+
     try{
         var [tempPlayer, cardColor, action, isAction] = LayCards(players[player], card, usedCards, usedCardsColor, color, res);
         usedCardsColor = cardColor;
@@ -78,14 +94,16 @@ app.post("/lay-cards", (req, res) => {
 
         switch (action.toLowerCase()) {
             case "draw2":
-                let [tempNextPlayerDraw2, cardsDrawn2] = Draw(nextPlayer, deck, 2);
+                let tempNextPlayerDraw2 = Draw(nextPlayer, deck, 2);
                 players[nextPlayer] = tempNextPlayerDraw2;
-                return res.json({"player": players[player], "cardsDrawn": cardsDrawn4, "color": usedCardsColor});
+                currentPlayersTurn = GetNextPlayer(player, players);
+                return res.json({"player": players[player], "color": usedCardsColor});
 
             case "draw4":
-                let [tempNextPlayerDraw4, cardsDrawn4] = Draw(nextPlayer, deck, 4);
+                let tempNextPlayerDraw4 = Draw(nextPlayer, deck, 4);
                 players[nextPlayer] = tempNextPlayerDraw4;
-                return res.json({"player": players[player], "cardsDrawn": cardsDrawn4, "color": usedCardsColor});
+                currentPlayersTurn = GetNextPlayer(player, players);
+                return res.json({"player": players[player],  "color": usedCardsColor});
 
             case "reverse":
                 tempPlayers = {};
@@ -93,9 +111,13 @@ app.post("/lay-cards", (req, res) => {
                     tempPlayers[obj] = players[obj]
                 })
                 players = tempPlayers;
-                break;
+                currentPlayersTurn = GetNextPlayer(player, players);
+                return res.json({"player": players[player],  "color": usedCardsColor});
             
             case "skip":
+                currentPlayersTurn = GetNextPlayer(currentPlayersTurn, players);
+                currentPlayersTurn = GetNextPlayer(currentPlayersTurn, players);
+                return res.json({"player": players[player],  "color": usedCardsColor});    
         }
     }
 })
