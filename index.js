@@ -130,6 +130,29 @@ app.post("/lay-cards", (req, res) => {
     }
 })
 
+// TODO: 
+
+// Add a shuffle endpoint 
+// (For when there is no cards left in the deck. 
+// Shuffle the used cards and make them the new deck
+// But keep the top card as the top card in used cards)
+
+// Add a Join Game endpoint.
+// This will allow a player to join the game.
+// The start-game should be used by the first player. 
+// And only create one player inside of players.
+// Join Game should then create more players inside of players.
+// And draw 7 cards for that player.
+// For join game people will send a username along
+// So in players we now longer use player1, player2 etc.
+// But instead we use the username that the player sent along 
+
+// Maybe rename the start-game endpoint to create-game
+// And then create a start-game endpoint that will start the game
+// And make the start game deal the first 7 cards to each player
+
+
+
 
 Array.prototype.shuffle = function() {
     var i = this.length, j, temp;
