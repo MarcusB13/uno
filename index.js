@@ -51,6 +51,14 @@ app.get("/reset-game", (req, res) => {
     res.send("Game reset");
 })
 
+app.get('/whos-turn', async (req, res) => {
+    res.json({"player": currentPlayersTurn});
+})
+
+app.get('/top-card', async (req, res) => {
+    res.json({"card": usedCards[0]});
+})
+
 app.post("/player-hand", (req, res) => {
     const { player } = req.body;
     let [error, canProceed] = CanRequestProceed(player, gameStarted, currentPlayersTurn);
