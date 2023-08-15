@@ -12,18 +12,15 @@ function CreateDeck(){
     return [fullDeck, firstUsedCard, firstUsedCardColor];
 }
 
-function CreatePlayerDeck(deck, amountOfPlayers){
-    let players = {};
+function CreatePlayer(deck){
+    let player = [];
 
-    for(let playerNumber = 1; playerNumber <= amountOfPlayers; playerNumber++){
-        players["player" + playerNumber] = [];
-        for(let cardNumber = 0; cardNumber < 7; cardNumber++){
-            let card = deck.shift();
-            players["player" + playerNumber].push(card)
-        }
+    for(let cardNumber = 0; cardNumber < 7; cardNumber++){
+        let card = deck.shift();
+        player.push(card)
     }
 
-    return players;
+    return player;
 }
 
 function DrawCard(deck, player){
@@ -95,10 +92,20 @@ function LayCards(player, card, usedCards, PreviousColor, wildCardColor, res){
     return [player, cardColor, action, isAction];
 }
 
+function ResetDeckWithUsedCards(deck, usedCards){
+    const topCard = usedCards.shift();
+    deck = deck.concat(usedCards);
+    deck.shuffle();
+    usedCards = [topCard];
+
+    return [tempDeck, tempUsedCards]
+}
+
 module.exports = {
     CreateDeck,
-    CreatePlayerDeck,
+    CreatePlayer,
     DrawCard,
     LayCards,
-    GetNextPlayer
+    GetNextPlayer,
+    ResetDeckWithUsedCards
 }

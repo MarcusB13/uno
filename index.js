@@ -7,10 +7,11 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 const port = 80;
 
-const { CreateDeck, CreatePlayerDeck, DrawCard, LayCards, GetNextPlayer } = require('./controllers/cards.js');
+const { CreateDeck, CreatePlayer, DrawCard, LayCards, GetNextPlayer, ResetDeckWithUsedCards } = require('./controllers/cards.js');
 const { Draw } = require('./controllers/actions.js');
 const { CanRequestProceed } = require('./controllers/game.js');
 
+// Game Variables
 var players = {};
 var deck = [];
 var usedCards = [];
@@ -18,27 +19,54 @@ var gameStarted = false;
 var usedCardsColor = "";
 var currentPlayersTurn = "";
 
+var gamePassword = "";
 
-app.get('/start-game', async (req, res) => {
-    if(gameStarted){
-        res.json(deck);
-        return
+app.post('/create-game', (req, res) => {
+    if (!gamePassword == ""){
+        return res.status(400).json({ message: "A game already exists" });
     }
+
+    gamePassword = Math.random().toString(36);
+    
     [tempDeck, tempUsedCard, color] = CreateDeck();
     deck = tempDeck;
     usedCardsColor = color;
     usedCards.push(tempUsedCard);
 
-    var tempPlayers = CreatePlayerDeck(deck, 2)
-    players = tempPlayers;
-
-    gameStarted = true;
-    currentPlayersTurn = Object.keys(players)[0];
-    console.log("Game started, start color is: " + usedCardsColor)
-    res.json(deck);
+    players["player1"] = CreatePlayer(deck);
+    res.json({"cards": players["player1"], "code": gamePassword})
 })
 
-app.get('/get-deck', async (req, res) => {
+app.post('/join-game',  (req, res) => {
+    const { secret } = req.body;
+
+    if (secret !== gamePassword) {
+        return res.status(400).json({ message: 'Invalid game pass' });
+    }
+    
+    var numberOfPlayers = Object.keys(players).length;
+    if (numberOfPlayers >= 4) {
+        return res.status(400).json({ message: 'Max number of players reached' });
+    }
+    
+    playerNumber = numberOfPlayers + 1;
+    playerName = "player" + playerNumber;
+
+    players[playerName] = CreatePlayer(deck);
+    res.json({ "cards": players[playerName] });
+});
+
+app.get('/start-game',  (req, res) => {
+    if(gameStarted){
+        return res.json(deck);
+    }
+    gameStarted = true;
+    currentPlayersTurn = Object.keys(players)[0];
+
+    res.json({ currentPlayersTurn, usedCardsColor });
+})
+
+app.get('/get-deck',  (req, res) => {
     res.json(deck);
 })
 
@@ -51,11 +79,11 @@ app.get("/reset-game", (req, res) => {
     res.send("Game reset");
 })
 
-app.get('/whos-turn', async (req, res) => {
+app.get('/whos-turn',  (req, res) => {
     res.json({"player": currentPlayersTurn});
 })
 
-app.get('/top-card', async (req, res) => {
+app.get('/top-card',  (req, res) => {
     res.json({"card": usedCards[0]});
 })
 
@@ -75,6 +103,12 @@ app.post("/draw-card", (req, res) => {
     if (!canProceed){
         res.status(400).send(error)
         return;
+    }
+
+    if (deck.length <= 4){
+        var [tempDeck, tempUsedCards] = ResetDeckWithUsedCards(deck, usedCards);
+        deck = tempDeck
+        usedCards = tempUsedCards
     }
     const card = DrawCard(deck, players[player]);
     res.json(card);
@@ -129,27 +163,6 @@ app.post("/lay-cards", (req, res) => {
         }
     }
 })
-
-// TODO: 
-
-// Add a shuffle endpoint 
-// (For when there is no cards left in the deck. 
-// Shuffle the used cards and make them the new deck
-// But keep the top card as the top card in used cards)
-
-// Add a Join Game endpoint.
-// This will allow a player to join the game.
-// The start-game should be used by the first player. 
-// And only create one player inside of players.
-// Join Game should then create more players inside of players.
-// And draw 7 cards for that player.
-// For join game people will send a username along
-// So in players we now longer use player1, player2 etc.
-// But instead we use the username that the player sent along 
-
-// Maybe rename the start-game endpoint to create-game
-// And then create a start-game endpoint that will start the game
-// And make the start game deal the first 7 cards to each player
 
 
 
