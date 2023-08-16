@@ -1,7 +1,4 @@
-function CanRequestProceed(player, gameStarted, currentPlayersTurn){
-    if (!gameStarted){
-        return ["Game has not started yet", false]
-    }
+function CanRequestProceed(player, currentPlayersTurn){
     if (player != currentPlayersTurn){
         return ["It is not your turn", false]
     }

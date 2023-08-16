@@ -1,15 +1,21 @@
 const fs = require('fs');
 const bodyParser = require('body-parser');
 
+
+
 const express = require('express')
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-const port = 80;
+const port = 3000;
 
 const { CreateDeck, CreatePlayer, DrawCard, LayCards, GetNextPlayer, ResetDeckWithUsedCards } = require('./controllers/cards.js');
 const { Draw } = require('./controllers/actions.js');
 const { CanRequestProceed } = require('./controllers/game.js');
+
+const server  = require("http").createServer(app)
+const io = require("socket.io")(server, {cors: {origin: "*"}})
+
 
 // Game Variables
 var players = {};
@@ -21,49 +27,87 @@ var currentPlayersTurn = "";
 
 var gamePassword = "";
 
-app.post('/create-game', (req, res) => {
-    if (!gamePassword == ""){
-        return res.status(400).json({ message: "A game already exists" });
-    }
+io.on("connection", (socket) => {
+    console.log("Connected")
 
-    gamePassword = Math.random().toString(36);
+    socket.on("create-game", (data) => {
+        console.log("Create game")
+
+        // if (!gamePassword == ""){
+        //     socket.emit("error", { message: "A game already exists" });
+        //     return;
+        // }
     
-    [tempDeck, tempUsedCard, color] = CreateDeck();
-    deck = tempDeck;
-    usedCardsColor = color;
-    usedCards.push(tempUsedCard);
+        gamePassword = Math.random().toString(36);
+        
+        [tempDeck, tempUsedCard, color] = CreateDeck();
+        deck = tempDeck;
+        usedCardsColor = color;
+        usedCards.push(tempUsedCard);
+    
+        players["player1"] = CreatePlayer(deck);
+        socket.emit("create-game", {"cards": players["player1"].sort(), "code": gamePassword})
+    })
 
-    players["player1"] = CreatePlayer(deck);
-    res.json({"cards": players["player1"], "code": gamePassword})
+    socket.on("join-game", (secret) => {
+        if (secret !== gamePassword) {
+            return socket.emit("error", { message: 'Invalid game pass' });
+        }
+        
+        var numberOfPlayers = Object.keys(players).length;
+        if (numberOfPlayers >= 4) {
+            return res.status(400).json({ message: 'Max number of players reached' });
+        }
+    
+        playerNumber = numberOfPlayers + 1;
+        playerName = "player" + playerNumber;
+    
+        players[playerName] = CreatePlayer(deck);
+        socket.emit("join-game", { "cards": players[playerName].sort(), "playerName": [playerName]});
+        io.emit("set-top-card", {"card": usedCards[0]})
+        io.emit("set-turn", {"whosTurn": currentPlayersTurn})
+    })
+
+    socket.on("start-game", (secret) => {
+        if (secret !== gamePassword) {
+            return socket.emit("error", { message: 'Invalid game pass' });
+        }
+    
+        if(gameStarted){
+            return res.json(deck);
+        }
+        gameStarted = true;
+        currentPlayersTurn = Object.keys(players)[0];
+    
+        io.emit("start-game", { currentPlayersTurn, usedCardsColor, "topCard": usedCards[0] });
+
+        var objPlayers = Object.keys(players)
+        var playersLength = objPlayers.length
+        for(let i = 0; i<playersLength; i++){
+            let playerName = objPlayers[i]
+            let cards = players[playerName]
+            io.emit("LoadPlayerCards", {"playerName": playerName, "cards": cards})
+        }
+    })
+
+    socket.on("console", (data) => {
+        console.log(data)
+    })
+
+    socket.on("disconnect", () => {
+
+    })
 })
 
+
+
+
 app.post('/join-game',  (req, res) => {
-    const { secret } = req.body;
 
-    if (secret !== gamePassword) {
-        return res.status(400).json({ message: 'Invalid game pass' });
-    }
-    
-    var numberOfPlayers = Object.keys(players).length;
-    if (numberOfPlayers >= 4) {
-        return res.status(400).json({ message: 'Max number of players reached' });
-    }
-    
-    playerNumber = numberOfPlayers + 1;
-    playerName = "player" + playerNumber;
-
-    players[playerName] = CreatePlayer(deck);
-    res.json({ "cards": players[playerName] });
 });
 
-app.get('/start-game',  (req, res) => {
-    if(gameStarted){
-        return res.json(deck);
-    }
-    gameStarted = true;
-    currentPlayersTurn = Object.keys(players)[0];
+app.post('/start-game',  (req, res) => {
 
-    res.json({ currentPlayersTurn, usedCardsColor });
 })
 
 app.get('/get-deck',  (req, res) => {
@@ -80,21 +124,29 @@ app.get("/reset-game", (req, res) => {
 })
 
 app.get('/whos-turn',  (req, res) => {
+    const { secret } = req.query;
+    if (secret !== gamePassword) {
+        return res.status(400).json({ message: 'Invalid game pass' });
+    }
     res.json({"player": currentPlayersTurn});
 })
 
 app.get('/top-card',  (req, res) => {
+    const { secret } = req.query;
+    if (secret !== gamePassword) {
+        return res.status(400).json({ message: 'Invalid game pass' });
+    }
     res.json({"card": usedCards[0]});
 })
 
-app.post("/player-hand", (req, res) => {
+app.get("/player-hand", (req, res) => {
     const { player } = req.body;
-    let [error, canProceed] = CanRequestProceed(player, gameStarted, currentPlayersTurn);
+    let [error, canProceed] = CanRequestProceed(player, currentPlayersTurn);
     if (!canProceed){
         res.status(400).send(error)
         return;
     }
-    res.json(players[player]);
+    res.json(players[player].sort());
 })
 
 app.post("/draw-card", (req, res) => {
@@ -114,7 +166,7 @@ app.post("/draw-card", (req, res) => {
     res.json(card);
 })
 
-app.post("/lay-cards", (req, res) => {
+app.post("/lay-card", (req, res) => {
     const { player, card, color } = req.body;
     let [error, canProceed] = CanRequestProceed(player, gameStarted, currentPlayersTurn);
     if (!canProceed){
@@ -179,4 +231,6 @@ Array.prototype.shuffle = function() {
     return this;
 }
 
-app.listen(port);
+server.listen(port, () => {
+    console.log("Server running")
+})
