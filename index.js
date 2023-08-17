@@ -102,14 +102,6 @@ io.on("connection", (socket) => {
 
 
 
-app.post('/join-game',  (req, res) => {
-
-});
-
-app.post('/start-game',  (req, res) => {
-
-})
-
 app.get('/get-deck',  (req, res) => {
     res.json(deck);
 })
