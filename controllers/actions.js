@@ -3,7 +3,7 @@ function Draw(nextPlayer, deck, numberOfCards) {
         let cardToDraw = deck.shift();
         nextPlayer.push(cardToDraw);
     }
-
+    nextPlayer.sort()
     return nextPlayer
 }
 

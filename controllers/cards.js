@@ -19,13 +19,13 @@ function CreatePlayer(deck){
         let card = deck.shift();
         player.push(card)
     }
-
     return player;
 }
 
 function DrawCard(deck, player){
     let card = deck.shift();
     player.push(card);
+    player.sort();
     return card;
 }
 
@@ -36,6 +36,15 @@ function GetCardColors(card){
     let cardIndex = fullDeck.indexOf(card);
     let cardColor = fullDeckColors[cardIndex];
     return cardColor;
+}
+
+function GetCardName(card){
+    let fullDeck = JSON.parse(cardsFile).fullDeck;
+    let fullDeckNames = JSON.parse(cardsFile).fullDeckNames;
+
+    let cardIndex = fullDeck.indexOf(card);
+    let cardName = fullDeckNames[cardIndex];
+    return cardName;
 }
 
 function IsWild(card){
@@ -65,31 +74,34 @@ function GetNextPlayer(currentPlayer, players){
     players =  Object.keys(players)
     let indexOfCurrentPlayer = players.indexOf(currentPlayer);
     let indexOfNextPlayer = indexOfCurrentPlayer + 1;
-    
-    let nextPlayer = players[indexOfNextPlayer ? indexOfNextPlayer : 0];
+
+    indexOfNextPlayer = indexOfNextPlayer < players.length ? indexOfNextPlayer : 0
+    let nextPlayer = players[indexOfNextPlayer];
     return nextPlayer;
 }
 
-function LayCards(player, card, usedCards, PreviousColor, wildCardColor, res){
+function LayCards(player, card, usedCards, PreviousColor, wildCardColor, socket){
     if(!player.includes(card)){
-        return res.status(400).send("Player does not have this card");
+        return socket.emit("error", "Player does not have this card");
     }
 
     let cardColor = GetCardColors(card);
+    let cardName = GetCardName(card);
+    let previousCardName = GetCardName(card);
     if(!IsWild(card)){
-        if(cardColor != PreviousColor){
-            return res.status(400).send("Card color does not match previous card color");
+        if(cardColor != PreviousColor && cardName != previousCardName){
+            return socket.emit("error", "Card color does not match previous card color");
         }
     } else {
         cardColor = wildCardColor;
     }
     
     let cardIndex = player.indexOf(card);
-    player.splice(cardIndex, cardIndex + 1);
+    player.splice(cardIndex, 1);
     usedCards.push(card);
 
     let [isAction, action] = ActionCard(card)
-    return [player, cardColor, action, isAction];
+    return [player, cardColor, action, isAction, usedCards];
 }
 
 function ResetDeckWithUsedCards(deck, usedCards){
